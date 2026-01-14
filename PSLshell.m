@@ -43,7 +43,9 @@ if 1 %% PSLs Generation
 	%% #Wing
 	% profile = struct('PSLsDensityCtrl', 3, 'PSLtypeCtrl', [0 0], 'topologyAware', 1, 'distanceMetric', 'Geodesic', 'seedSparsityCtrl', 1, 'maxIts', 2000);
 	%% #Wind turbine blade
-	% profile = struct('PSLsDensityCtrl', 5, 'PSLtypeCtrl', [0 0], 'topologyAware', 1, 'distanceMetric', 'Geodesic', 'seedSparsityCtrl', 1, 'maxIts', 2000);	
+	% profile = struct('PSLsDensityCtrl', 5, 'PSLtypeCtrl', [0 0], 'topologyAware', 1, 'distanceMetric', 'Geodesic', 'seedSparsityCtrl', 1, 'maxIts', 2000);
+	%% #TPMS
+	% profile = struct('PSLsDensityCtrl', 40, 'PSLtypeCtrl', [0 0], 'topologyAware', 1, 'distanceMetric', 'Euclidean', 'seedSparsityCtrl', 1, 'maxIts', 2000);    
 	SeedingPSLs(profile); 
 	disp(['Seeding PSL Costs: ' sprintf('%10.3g',toc(tStart)) 's']);
 	
