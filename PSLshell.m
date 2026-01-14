@@ -33,6 +33,17 @@ if 1 %% PSLs Generation
 		'seedSparsityCtrl',		1,				... %% Every 'value' element is sampled
 		'maxIts',				1000			... %% Maximum Integration Steps in a Single Run of PSL Tracing
 	);
+	%% =================================Settings for Paper replicability=================================
+	%% #Planar Plate
+	% profile = struct('PSLsDensityCtrl', 30, 'PSLtypeCtrl', [0 0], 'topologyAware', 1, 'distanceMetric', 'Euclidean', 'seedSparsityCtrl', 1, 'maxIts', 1000);
+	%% #Cylinder; #Dome
+	% profile = struct('PSLsDensityCtrl', 10, 'PSLtypeCtrl', [0 0], 'topologyAware', 1, 'distanceMetric', 'Euclidean', 'seedSparsityCtrl', 1, 'maxIts', 1000);
+	%% #Polyhedra-like Structure
+	% profile = struct('PSLsDensityCtrl', 15, 'PSLtypeCtrl', [0 0], 'topologyAware', 1, 'distanceMetric', 'Euclidean', 'seedSparsityCtrl', 1, 'maxIts', 1000);
+	%% #Wing
+	% profile = struct('PSLsDensityCtrl', 3, 'PSLtypeCtrl', [0 0], 'topologyAware', 1, 'distanceMetric', 'Geodesic', 'seedSparsityCtrl', 1, 'maxIts', 2000);
+	%% #Wind turbine blade
+	% profile = struct('PSLsDensityCtrl', 5, 'PSLtypeCtrl', [0 0], 'topologyAware', 1, 'distanceMetric', 'Geodesic', 'seedSparsityCtrl', 1, 'maxIts', 2000);	
 	SeedingPSLs(profile); 
 	disp(['Seeding PSL Costs: ' sprintf('%10.3g',toc(tStart)) 's']);
 	
@@ -49,19 +60,6 @@ else %% Check Mesh Normals
 		% ExportStressFieldWithFlippedNormals(strcat(stressfileNameNew, '.TSV'));
 	% end	
 end
-
-%% =================================Settings for Paper replicability=================================
-%% #Planar Plate
-%% profile = struct('PSLsDensityCtrl', 30, 'PSLtypeCtrl', [0 0], 'topologyAware', 1, 'distanceMetric', 'Euclidean', 'seedSparsityCtrl', 1, 'maxIts', 1000);
-%% #Cylinder; #Dome
-%% profile = struct('PSLsDensityCtrl', 10, 'PSLtypeCtrl', [0 0], 'topologyAware', 1, 'distanceMetric', 'Euclidean', 'seedSparsityCtrl', 1, 'maxIts', 1000);
-%% #Polyhedra-like Structure
-%% profile = struct('PSLsDensityCtrl', 15, 'PSLtypeCtrl', [0 0], 'topologyAware', 1, 'distanceMetric', 'Euclidean', 'seedSparsityCtrl', 1, 'maxIts', 1000);
-%% #Wing
-%% profile = struct('PSLsDensityCtrl', 3, 'PSLtypeCtrl', [0 0], 'topologyAware', 1, 'distanceMetric', 'Geodesic', 'seedSparsityCtrl', 1, 'maxIts', 2000);
-%% #Wind turbine blade
-%% profile = struct('PSLsDensityCtrl', 5, 'PSLtypeCtrl', [0 0], 'topologyAware', 1, 'distanceMetric', 'Geodesic', 'seedSparsityCtrl', 1, 'maxIts', 2000);
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%Source
@@ -113,7 +111,7 @@ end
 
 
 function ImportStressFields(fileName)
-	global dataVersionID_ meshType_ frameType_ meshOrder_ numNodes_ nodeCoords_ numEles_ eNodMat_ meshTypeMap_;
+	global frameType_ meshOrder_ numNodes_ nodeCoords_ numEles_ eNodMat_ meshTypeMap_;
 	global localStressField_ globalStressField_ loadingCond_ fixingCond_ nodeWiseStressField_;
 	global refVec_ refVecFallback_;
 	
@@ -122,181 +120,88 @@ function ImportStressFields(fileName)
 	%%1.1 Mesh
 	% fgetl(fid);
 	tmp = fscanf(fid, '%s', 1);
-	dataVersionID_ = fscanf(fid, '%f', 1);
-	switch dataVersionID_
-		case 2.0
-			frameType_ = 'LOCAL';
-			tmp = fscanf(fid, '%s %s %s', 3);
-			dataType = fscanf(fid, '%s', 1);
-			switch dataType
-				case 'NODE', nodeWiseStressField_ = 1;
-				case 'ELEMENT', nodeWiseStressField_ = 0; %%Element-wise Stress Data
-				otherwise, error('Un-supported Stress Data!');
-			end
-			domainType = fscanf(fid, '%s', 1);
-			if ~strcmp(domainType, 'Shell'), error('Un-supported Data!'); end
-			meshType_ = fscanf(fid, '%s', 1);
-			if ~(strcmp(meshType_, 'Quad') || strcmp(meshType_, 'Tri') || strcmp(meshType_, 'Hybrid')), error('Un-supported Mesh!'); end
-			meshOrder_ = fscanf(fid, '%d', 1);
-			if ~(1==meshOrder_ || 2==meshOrder_), error('Un-supported Mesh!'); end
-			startReadingVertices = fscanf(fid, '%s', 1);
-			if ~strcmp(startReadingVertices, 'Vertices:'), error('Un-supported Data!'); end
-			numNodes_ = fscanf(fid, '%d', 1);
-			nodeCoords_ = fscanf(fid, '%e %e %e', [3, numNodes_])'; 
-			startReadingElements = fscanf(fid, '%s', 1);
-			if ~strcmp(startReadingElements, 'Elements:'), error('Un-supported Data!'); end
-			numEles_ = fscanf(fid, '%d', 1);
-
-			switch meshType_
-				case 'Quad'
-					switch meshOrder_
-						case 1
-							meshTypeMap_ = repmat("Q4", numEles_,1);
-							eNodMat_ = fscanf(fid, '%d %d %d %d', [4, numEles_])';
-						case 2
-							meshTypeMap_ = repmat("Q8", numEles_,1);
-							eNodMat_ = fscanf(fid, '%d %d %d %d %d %d %d %d', [8, numEles_])';
-					end
-				case 'Tri'
-					switch meshOrder_
-						case 1
-							meshTypeMap_ = repmat("T3", numEles_,1);
-							eNodMat_ = fscanf(fid, '%d %d %d', [3, numEles_])';		
-						case 2
-							meshTypeMap_ = repmat("T6", numEles_,1);
-							eNodMat_ = fscanf(fid, '%d %d %d %d %d %d', [6, numEles_])';			
-					end
-				case 'Hybrid'
-					switch meshOrder_
-						case 1
-							eNodMat_ = NaN(numEles_, 4);
-							meshTypeMap_ = repmat("Q4", numEles_,1);
-							for ii=1:numEles_
-								iNumNodesPerEle = fscanf(fid, '%d', 1);
-								switch iNumNodesPerEle
-									case 3
-										eNodMat_(ii,1:3) = fscanf(fid, '%d %d %d', [3, 1])';
-										meshTypeMap_(ii) = "T3";
-									case 4
-										eNodMat_(ii,:) = fscanf(fid, '%d %d %d %d', [4, 1])';
-								end
-							end
-						case 2
-							eNodMat_ = NaN(numEles_, 8);
-							meshTypeMap_ = repmat("Q8", numEles_,1);
-							for ii=1:numEles_
-								iNumNodesPerEle = fscanf(fid, '%d', 1);
-								switch iNumNodesPerEle
-									case 6
-										eNodMat_(ii,1:6) = fscanf(fid, '%d %d %d %d %d %d', [6, 1])';
-										meshTypeMap_(ii) = "T6";
-									case 8
-										eNodMat_(ii,:) = fscanf(fid, '%d %d %d %d %d %d %d %d', [8, 1])';
-								end
-							end
-					end
-			end
-	
-			%%1.2 Stress Related
-			startReadingLoads = fscanf(fid, '%s %s', 2); 
-			if ~strcmp(startReadingLoads, 'NodeForces:'), error('Un-supported Data!'); end
-			numLoadedNodes = fscanf(fid, '%d', 1);
-			if numLoadedNodes>0, loadingCond_ = fscanf(fid, '%d %e %e %e %e %e %e', [7, numLoadedNodes])'; else, loadingCond_ = []; end
-			
-			startReadingFixations = fscanf(fid, '%s %s', 2);
-			if ~strcmp(startReadingFixations, 'FixedNodes:'), error('Un-supported Data!'); end
-			numFixedNodes = fscanf(fid, '%d', 1);
-			if numFixedNodes>0, fixingCond_ = fscanf(fid, '%d %d %d %d %d %d %d', [7, numFixedNodes])'; else, fixingCond_ = []; end
-			
-			startReadingStress = fscanf(fid, '%s %s', 2); 
-			if ~strcmp(startReadingStress, 'CartesianStress:'), error('Un-supported Data!'); end
-			numValidNods = fscanf(fid, '%d', 1);
-			%% Per-row: sigma_xx, sigma_yy, sigma_xy
-			localStressField_ = fscanf(fid, '%e %e %e', [3, numValidNods])';		
-			fclose(fid);	
-		case 3.0
-			tmp = fscanf(fid, '%s %s %s', 3);
-			dataType = fscanf(fid, '%s', 1);
-			switch dataType
-				case 'NODE', nodeWiseStressField_ = 1;
-				case 'ELEMENT', nodeWiseStressField_ = 0; %%Element-wise Stress Data
-				otherwise, error('Un-supported Stress Data!');
-			end
-			domainType = fscanf(fid, '%s', 1);
-			if ~strcmp(domainType, 'Shell'), error('Un-supported Data!'); end
-			%meshType_ = fscanf(fid, '%s', 1);
-			%if ~(strcmp(meshType_, 'Quad') || strcmp(meshType_, 'Tri') || strcmp(meshType_, 'Hybrid')), error('Un-supported Mesh!'); end
-			meshOrder_ = fscanf(fid, '%d', 1);
-			if ~(1==meshOrder_ || 2==meshOrder_), error('Un-supported Mesh!'); end
-			tmp = fscanf(fid, '%s', 1); frameType_ = fscanf(fid, '%s', 1);
-			if strcmp(frameType_, 'LOCAL')
-				tmp = fscanf(fid, '%s %s', 2); refVec_ = fscanf(fid, '%e %e %e', [3, 1])';
-				tmp = fscanf(fid, '%s %s', 2); refVecFallback_ = fscanf(fid, '%e %e %e', [3, 1])';
-			end
-			startReadingVertices = fscanf(fid, '%s', 1);
-			if ~strcmp(startReadingVertices, 'Vertices:'), error('Un-supported Data!'); end
-			numNodes_ = fscanf(fid, '%d', 1);
-			nodeCoords_ = fscanf(fid, '%e %e %e', [3, numNodes_])'; 
-			startReadingElements = fscanf(fid, '%s', 1);
-			if ~strcmp(startReadingElements, 'Elements:'), error('Un-supported Data!'); end
-			numEles_ = fscanf(fid, '%d', 1);
-			switch meshOrder_
-				case 1
-					eNodMat_ = NaN(numEles_, 4);
-					meshTypeMap_ = repmat("Q4", numEles_,1);
-					for ii=1:numEles_
-						iNumNodesPerEle = fscanf(fid, '%d', 1);
-						switch iNumNodesPerEle
-							case 3
-								eNodMat_(ii,1:3) = fscanf(fid, '%d %d %d', [3, 1])';
-								meshTypeMap_(ii) = "T3";
-							case 4
-								eNodMat_(ii,1:4) = fscanf(fid, '%d %d %d %d', [4, 1])';
-						end
-					end					
-				case 2
-					eNodMat_ = NaN(numEles_, 8);
-					meshTypeMap_ = repmat("Q8", numEles_,1);
-					for ii=1:numEles_
-						iNumNodesPerEle = fscanf(fid, '%d', 1);
-						switch iNumNodesPerEle
-							case 6
-								eNodMat_(ii,1:6) = fscanf(fid, '%d %d %d %d %d %d', [6, 1])';
-								meshTypeMap_(ii) = "T6";
-							case 8
-								eNodMat_(ii,1:8) = fscanf(fid, '%d %d %d %d %d %d %d %d', [8, 1])';
-						end
-					end					
-			end
-			%%1.2 Stress Related
-			startReadingLoads = fscanf(fid, '%s %s', 2); 
-			if ~strcmp(startReadingLoads, 'NodeForces:'), error('Un-supported Data!'); end
-			numLoadedNodes = fscanf(fid, '%d', 1);
-			if numLoadedNodes>0, loadingCond_ = fscanf(fid, '%d %e %e %e %e %e %e', [7, numLoadedNodes])'; else, loadingCond_ = []; end
-			
-			startReadingFixations = fscanf(fid, '%s %s', 2);
-			if ~strcmp(startReadingFixations, 'FixedNodes:'), error('Un-supported Data!'); end
-			numFixedNodes = fscanf(fid, '%d', 1);
-			if numFixedNodes>0, fixingCond_ = fscanf(fid, '%d %d %d %d %d %d %d', [7, numFixedNodes])'; else, fixingCond_ = []; end
-			
-			startReadingStress = fscanf(fid, '%s %s', 2); 
-			if ~strcmp(startReadingStress, 'CartesianStress:'), error('Un-supported Data!'); end
-			numValidNods = fscanf(fid, '%d', 1);
-			switch frameType_
-				case 'LOCAL'
-					%% Per-row: sigma_xx, sigma_yy, sigma_xy
-					localStressField_ = fscanf(fid, '%e %e %e', [3, numValidNods])';
-				case 'GLOBAL'
-					%% Per-row: sigma_xx, sigma_yy, sigma_zz, sigma_yz, sigma_zx, sigma_xy
-					globalStressField_ = fscanf(fid, '%e %e %e %e %e %e', [6, numValidNods])';
-			end
-			fclose(fid);			
+	dataVersionID = fscanf(fid, '%f', 1);
+	tmp = fscanf(fid, '%s %s %s', 3);
+	dataType = fscanf(fid, '%s', 1);
+	switch dataType
+		case 'NODE', nodeWiseStressField_ = 1;
+		case 'ELEMENT', nodeWiseStressField_ = 0; %%Element-wise Stress Data
+		otherwise, error('Un-supported Stress Data!');
 	end
+	domainType = fscanf(fid, '%s', 1);
+	if ~strcmp(domainType, 'Shell'), error('Un-supported Data!'); end
+	%meshType_ = fscanf(fid, '%s', 1);
+	%if ~(strcmp(meshType_, 'Quad') || strcmp(meshType_, 'Tri') || strcmp(meshType_, 'Hybrid')), error('Un-supported Mesh!'); end
+	meshOrder_ = fscanf(fid, '%d', 1);
+	if ~(1==meshOrder_ || 2==meshOrder_), error('Un-supported Mesh!'); end
+	tmp = fscanf(fid, '%s', 1); frameType_ = fscanf(fid, '%s', 1);
+	if strcmp(frameType_, 'LOCAL')
+		tmp = fscanf(fid, '%s %s', 2); refVec_ = fscanf(fid, '%e %e %e', [3, 1])';
+		tmp = fscanf(fid, '%s %s', 2); refVecFallback_ = fscanf(fid, '%e %e %e', [3, 1])';
+	end
+	startReadingVertices = fscanf(fid, '%s', 1);
+	if ~strcmp(startReadingVertices, 'Vertices:'), error('Un-supported Data!'); end
+	numNodes_ = fscanf(fid, '%d', 1);
+	nodeCoords_ = fscanf(fid, '%e %e %e', [3, numNodes_])'; 
+	startReadingElements = fscanf(fid, '%s', 1);
+	if ~strcmp(startReadingElements, 'Elements:'), error('Un-supported Data!'); end
+	numEles_ = fscanf(fid, '%d', 1);
+	switch meshOrder_
+		case 1
+			eNodMat_ = NaN(numEles_, 4);
+			meshTypeMap_ = repmat("Q4", numEles_,1);
+			for ii=1:numEles_
+				iNumNodesPerEle = fscanf(fid, '%d', 1);
+				switch iNumNodesPerEle
+					case 3
+						eNodMat_(ii,1:3) = fscanf(fid, '%d %d %d', [3, 1])';
+						meshTypeMap_(ii) = "T3";
+					case 4
+						eNodMat_(ii,1:4) = fscanf(fid, '%d %d %d %d', [4, 1])';
+				end
+			end					
+		case 2
+			eNodMat_ = NaN(numEles_, 8);
+			meshTypeMap_ = repmat("Q8", numEles_,1);
+			for ii=1:numEles_
+				iNumNodesPerEle = fscanf(fid, '%d', 1);
+				switch iNumNodesPerEle
+					case 6
+						eNodMat_(ii,1:6) = fscanf(fid, '%d %d %d %d %d %d', [6, 1])';
+						meshTypeMap_(ii) = "T6";
+					case 8
+						eNodMat_(ii,1:8) = fscanf(fid, '%d %d %d %d %d %d %d %d', [8, 1])';
+				end
+			end					
+	end
+	%%1.2 Stress Related
+	startReadingLoads = fscanf(fid, '%s %s', 2); 
+	if ~strcmp(startReadingLoads, 'NodeForces:'), error('Un-supported Data!'); end
+	numLoadedNodes = fscanf(fid, '%d', 1);
+	if numLoadedNodes>0, loadingCond_ = fscanf(fid, '%d %e %e %e %e %e %e', [7, numLoadedNodes])'; else, loadingCond_ = []; end
+	
+	startReadingFixations = fscanf(fid, '%s %s', 2);
+	if ~strcmp(startReadingFixations, 'FixedNodes:'), error('Un-supported Data!'); end
+	numFixedNodes = fscanf(fid, '%d', 1);
+	if numFixedNodes>0, fixingCond_ = fscanf(fid, '%d %d %d %d %d %d %d', [7, numFixedNodes])'; else, fixingCond_ = []; end
+	
+	startReadingStress = fscanf(fid, '%s %s', 2); 
+	if ~strcmp(startReadingStress, 'CartesianStress:'), error('Un-supported Data!'); end
+	numValidNods = fscanf(fid, '%d', 1);
+	switch frameType_
+		case 'LOCAL'
+			%% Per-row: sigma_xx, sigma_yy, sigma_xy
+			localStressField_ = fscanf(fid, '%e %e %e', [3, numValidNods])';
+		case 'GLOBAL'
+			%% Per-row: sigma_xx, sigma_yy, sigma_zz, sigma_yz, sigma_zx, sigma_xy
+			globalStressField_ = fscanf(fid, '%e %e %e %e %e %e', [6, numValidNods])';
+	end
+	fclose(fid);	
 end
 
 
 function PreProcessData()
-	global boundingBox_ dataVersionID_ meshType_ frameType_ meshOrder_;
+	global boundingBox_ frameType_ meshOrder_;
 	global numNodes_ nodeCoords_ numEles_ eNodMat_ eleCentroids_ meshTypeMap_ voidEleMap_;
 	global localStressField_ globalStressField_ localStressFieldPerEle_ globalStressFieldPerEle_;
 	global silhouetteStruct_ eleCharacterSizeList_ refScalingSize_ shellEleNormals_ shellCurvatureScaling_;
@@ -308,21 +213,8 @@ function PreProcessData()
 	silhouetteStruct_.vertices = nodeCoords_;
 	silhouetteStruct_.faces = eNodMat_;
 	if 2==meshOrder_
-		switch dataVersionID_
-			case 2
-				switch meshType_
-					case 'Quad'
-						silhouetteStruct_.faces = silhouetteStruct_.faces(:, [1 5 2 6 3 7 4 8]);
-					case 'Tri'
-						silhouetteStruct_.faces = silhouetteStruct_.faces(:, [1 4 2 5 3 6]);
-					case 'Hybrid'
-						silhouetteStruct_.faces('Q8'==meshTypeMap_,:) = silhouetteStruct_.faces('Q8'==meshTypeMap_,[1 5 2 6 3 7 4 8]);
-						silhouetteStruct_.faces('T6'==meshTypeMap_,:) = silhouetteStruct_.faces('T6'==meshTypeMap_,[1 4 2 5 3 6 7 8]);
-				end			
-			case 3
-				silhouetteStruct_.faces('Q8'==meshTypeMap_,:) = silhouetteStruct_.faces('Q8'==meshTypeMap_,[1 5 2 6 3 7 4 8]);
-				silhouetteStruct_.faces('T6'==meshTypeMap_,:) = silhouetteStruct_.faces('T6'==meshTypeMap_,[1 4 2 5 3 6 7 8]);					
-		end	
+		silhouetteStruct_.faces('Q8'==meshTypeMap_,:) = silhouetteStruct_.faces('Q8'==meshTypeMap_,[1 5 2 6 3 7 4 8]);
+		silhouetteStruct_.faces('T6'==meshTypeMap_,:) = silhouetteStruct_.faces('T6'==meshTypeMap_,[1 4 2 5 3 6 7 8]);	
 	end
 	eleCentroids_ = zeros(numEles_, 3);
 	for ii=1:numEles_
@@ -529,7 +421,6 @@ function PreProcessData()
 		iEleType = meshTypeMap_(ii);
 		switch iEleType
 			case 'T3'
-				iPara = [1 1]/3;
 				iEleNodes = eNodMat_(ii,1:3);
 				parasNodes = [0.0 0.0; 1.0 0.0; 0.0 1.0];
 				iEleNodeCoords = nodeCoords_(iEleNodes,:);
@@ -538,7 +429,6 @@ function PreProcessData()
 					[nodeLocalFrames(:,:,jj), ~, ~, ~] = ComputeLocalFrameAtGivenPosition(parasNodes(jj,:), iEleNodeCoords, iEleType);
 				end				
 			case 'Q4'
-				iPara = [0 0];
 				iEleNodes = eNodMat_(ii,1:4);
 				parasNodes = [-1.0 -1.0; 1.0 -1.0; 1.0 1.0; -1.0 1.0];
 				iEleNodeCoords = nodeCoords_(iEleNodes,:);	
@@ -547,7 +437,6 @@ function PreProcessData()
 					[nodeLocalFrames(:,:,jj), ~, ~, ~] = ComputeLocalFrameAtGivenPosition(parasNodes(jj,:), iEleNodeCoords, iEleType);
 				end						
 			case 'T6'
-				iPara = [1 1]/3;
 				iEleNodes = eNodMat_(ii,1:6);
 				parasNodes = [0.0 0.0; 1.0 0.0; 0.0 1.0; 0.5 0.0; 0.5 0.5; 0.0 0.5];
 				iEleNodeCoords = nodeCoords_(iEleNodes,:);	
@@ -556,7 +445,6 @@ function PreProcessData()
 					[nodeLocalFrames(:,:,jj), ~, ~, ~] = ComputeLocalFrameAtGivenPosition(parasNodes(jj,:), iEleNodeCoords, iEleType);
 				end				
 			case 'Q8'
-				iPara = [0 0];
 				iEleNodes = eNodMat_(ii,1:8);
 				parasNodes = [-1.0 -1.0; 1.0 -1.0; 1.0 1.0; -1.0 1.0; 0.0 -1.0; 1.0 0.0; 0.0 1.0; -1.0 0.0];
 				iEleNodeCoords = nodeCoords_(iEleNodes,:);				
@@ -1315,7 +1203,6 @@ end
 function parasOut = AvoidExactLocationAtVertexOrEdge4Robustness(parasIn, eleType, safetyScaling)
 	xi = parasIn(1);
 	eta = parasIn(2);
-	tolEff = 1.0e3 * eps(1.0);
 	tolEff = safetyScaling;
 	if strcmp(eleType, 'T3') || strcmp(eleType, 'T6')
 		if abs(xi)<tolEff
@@ -1357,7 +1244,6 @@ function inside = CheckWhetherGivenNaturalCoordinatesWithinDomain(paras, eleType
 		error('Infinite Natural Coordinates!');
 	end
 	
-	scale = max(1, max(abs(xi), abs(eta)));
 	if 3==nargin
 		tolEff = varargin{1};
 	else
@@ -1378,9 +1264,7 @@ function inside = CheckWhetherGivenNaturalCoordinatesWithinDomain(paras, eleType
 end
 
 function [R, origin, t1, t2] = ComputeLocalFrameAtGivenPosition(paras, iEleNodes, elementType)
-	global refVec_;
-	global refVecFallback_;
-	global tolRefVecFallback_;
+	global refVec_ refVecFallback_ tolRefVecFallback_;
 	N = ShapeFunction(paras, elementType);
 	[dNdxi, dNdeta] = DeShapeFunction(paras, elementType);
 	%%Tangent Planes at "paras"
@@ -2918,24 +2802,7 @@ function ShowProblemDescription()
 		tarNodeCoord = nodeCoords_(fixingCond_(:,1),:);
 		hold('on'); hd1 = plot3(tarNodeCoord(:,1), tarNodeCoord(:,2), tarNodeCoord(:,3), 'x', ...
 			'color', [153 153 153]/255, 'LineWidth', 3, 'MarkerSize', 15);		
-	end
-	if 0
-		global eNodMat_;
-		global meshTypeMap_;
-		hold('on');
-		% midNodes = eNodMat_(:,5:8); midNodes = unique(midNodes);
-		midNodes_tri = eNodMat_("T6"==meshTypeMap_,4:6);
-		midNodes_quad = eNodMat_("Q8"==meshTypeMap_,5:8);
-		midNodes = unique([midNodes_tri(:); midNodes_quad(:)]);
-		if 0
-			plot3(nodeCoords_(midNodes,1), nodeCoords_(midNodes,2), nodeCoords_(midNodes,3), '.', 'Color', [222 125 0]/255, 'LineWidth', 2, 'MarkerSize', 25);
-		else
-			lineWidthTube = 2.0*min(boundingBox_(2,:)-boundingBox_(1,:))/100;
-			[patchX, patchY, patchZ] = GetSpheresOfPoints(nodeCoords_(midNodes,:), 1*lineWidthTube);
-			handleNodes = surf(patchX, patchY, patchZ, ones(size(patchZ)));
-			set(handleNodes, 'FaceColor', [222 125 0]/255, 'FaceAlpha', 1, 'EdgeAlpha', 0);
-		end
-	end
+    end
 	if ~isempty(find(0==(boundingBox_(2,:)-boundingBox_(1,:)))) %%2D
 		view(2);
 	else
@@ -3018,21 +2885,12 @@ function ComputeTopologicalSkeletons()
 		JsurfaceMapping = [sum(t1(:).*e1) sum(t2(:).*e1); sum(t1(:).*e2) sum(t2(:).*e2)];
 		dNdxy = inv(JsurfaceMapping)' * [dNds; dNdt];
 		if approxiInterp_
-if 0		
-			f1 = (iEleStressTensorLocal(:,1)-iEleStressTensorLocal(:,2))/2;
-			f2 = iEleStressTensorLocal(:,3);
-			df1dx = dNdxy(1,:)*f1; a = df1dx;
-			df1dy = dNdxy(2,:)*f1; b = df1dy;
-			df2dx = dNdxy(1,:)*f2; c = df2dx;
-			df2dy = dNdxy(2,:)*f2; d = df2dy;			
-else
 			dStressdxLocal = dNdxy(1,:) * iEleStressTensorLocal;
 			dStressdyLocal = dNdxy(2,:) * iEleStressTensorLocal;
 			df1dx = (dStressdxLocal(1)-dStressdxLocal(2))/2; a = df1dx;
 			df1dy = (dStressdyLocal(1)-dStressdyLocal(2))/2; b = df1dy;
 			df2dx = dStressdxLocal(3); c = df2dx;
-			df2dy = dStressdyLocal(3); d = df2dy;					
-end
+			df2dy = dStressdyLocal(3); d = df2dy;
 		else
 			dStressdxGlobal = dNdxy(1,:) * iEleStressTensorGlobal;
 			dStressdxLocal = GlobalFrame2Local_StressTensor(dStressdxGlobal, iLocalFrame, 1); %% D_sigma_xx_D_xx, D_sigma_yy_D_xx, D_sigma_xy_D_xx
@@ -3066,7 +2924,6 @@ end
 end
 
 function val = DegeneratePointStruct()
-	vec = struct('ith', 0, 'length', 0, 'vec', [], 'index', []);
 	PSL = PrincipalStressLineStruct();
 	val = struct(	...
 		'eleIndex',							0,	...
@@ -3106,12 +2963,6 @@ function LocateDegeneratePoints()
 					distilledCandidateElements(end+1,1:3) = [iEle paras(:)'];
 				end						
 			case 'T6'
-if 0
-				[paras, isDegePt] = NewtonRhapson_LocatingDegPt(iEle, [0 0]);
-				if isDegePt
-					distilledCandidateElements(end+1,1:3) = [iEle paras(:)'];
-				end	
-else			
 				tmpDistilledCandiEle = [];
 				[paras1, isDegePt1] = NewtonRhapson_LocatingDegPt(iEle, [0 0], 'T6_1');
 				if isDegePt1
@@ -3149,8 +3000,7 @@ else
 				end
 				if ~isempty(tmpDistilledCandiEle)
 					distilledCandidateElements(end+1:end+size(tmpDistilledCandiEle,1),:) = tmpDistilledCandiEle;
-				end
-end				
+				end			
 			case 'Q8'
 				tmpDistilledCandiEle = [];
 				[paras1, isDegePt1] = NewtonRhapson_LocatingDegPt(iEle, [0 0], 'Q8_1');
@@ -3239,7 +3089,7 @@ end
 end
 
 function IdentifyCandidateElements()
-	global numEles_ eNodMat_ meshTypeMap_ boundaryElements_ voidEleMap_;
+	global numEles_ meshTypeMap_ boundaryElements_ voidEleMap_;
 	global localStressFieldPerEle_;
 	global candidateElementsIncDegePts_;
 	
@@ -3278,7 +3128,6 @@ function opt = DegenrationMeasure_BernsteinBoundingQuad(eleStress)
 	S1 = reshape(f1, 3, 3)';
 	S2 = reshape(f2, 3, 3)';
 
-	tau = 1.0e-12;
 	C = [1 0 0; -0.5 2 -0.5; 0 0 1];
 	B1 = C * S1 * C';
 	B2 = C * S2 * C';
@@ -3298,7 +3147,6 @@ function [paras, isDegePt] = NewtonRhapson_LocatingDegPt(iEle, target, varargin)
 	global approxiInterp_;
 	
 	target = target(:)';
-	% vtxVals = vtxVals / max(vecnorm(vtxVals,2,2));
 	
 	maxIts = 30;
 	tol_r  = 1e-5;                      % residual tolerance (stress units)
@@ -3306,7 +3154,6 @@ function [paras, isDegePt] = NewtonRhapson_LocatingDegPt(iEle, target, varargin)
 	lambda0 = 0;                         % LM damping (0 = pure Newton)
 	project_to_domain = true;
 	iEleType = meshTypeMap_(iEle);	
-	% --- initial guess and element metadata
 	switch iEleType
 		case 'T3'
 			natCoordScope = [0 0; 1 0; 0 1];
