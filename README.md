@@ -1,10 +1,10 @@
 # PSLshell
 
-## Demo Result
 <p align="center">
   <img src="figures/psl_demo.png" width="700"/>
 </p>
 
+Topology-aware principal stress line tracing on shell structures.
 
 **PSLshell** is a MATLAB implementation for tracing and visualizing principal stress lines (PSLs) on shell structures.
 
@@ -48,7 +48,7 @@ PSLshell reads stress fields from a `.TSV` file, which contains:
 
 - Mesh vertices  
 - Element connectivity  
-- Boundary Condition Info (optional)
+- Boundary condition Info (optional)
 - Stress tensor components  
 
 The stress tensor can be defined in:
@@ -96,6 +96,7 @@ PSLshell generates:
 - Topological skeletons  
 
 ## Citation
+```bibtex
 If you use this code, please cite:
 @article{wang2026topology,
   title={Topology-aware stress analysis in shell structures},
@@ -106,8 +107,9 @@ If you use this code, please cite:
   year={2026},
   publisher={Elsevier}
 }
+```
 
 ## Author
-Junpeng Wang
-Technical University of Munich
+Junpeng Wang  
+Technical University of Munich  
 junpeng.wang@tum.de
