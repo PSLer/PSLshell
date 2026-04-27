@@ -1,7 +1,7 @@
 # PSLshell
 
 <p align="center">
-  <img src="figures/psl_demo.png" width="700"/>
+  <img src="figures/PSLs_demo.png" width="700"/>
 </p>
 
 Topology-aware principal stress line tracing on shell structures.
